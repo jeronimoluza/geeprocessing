@@ -384,7 +384,7 @@ def export_seasonal_weather_stats(
     region_name,
     region_id_property,
     scale=9000,
-    folder_name="GEE_WEATHER_OUTPUT",
+    folder_name="GEE_WEATHER_EXPORTS",
     apply_gap_filling=True,
     start_month=1,
     end_month=12,
@@ -588,172 +588,6 @@ def export_seasonal_weather_stats(
     )
 
 
-def process_weather_data_batch(
-    start_year=1981,
-    end_year=2023,
-    export_hourly=True,
-    export_seasonal=True,
-    apply_gap_filling=True,
-    scale=9000,
-    folder_name="GEE_WEATHER_EXPORTS",
-    groups_of_n_months=3,
-):
-    """
-    Batch process weather data for Mongolia and Inner Mongolia, China from start_year to end_year.
-    This is the main function that implements the complete workflow as specified in project requirements.
-
-    Parameters:
-    - start_year (int): Starting year for processing (default: 1981)
-    - end_year (int): Ending year for processing (default: 2023)
-    - export_hourly (bool): Whether to export cleaned hourly data
-    - export_seasonal (bool): Whether to export seasonal aggregates
-    - apply_gap_filling (bool): Whether to apply temporal gap-filling strategy
-    - scale (int): Scale in meters for spatial reduction
-    - folder_name (str): Google Drive folder for exports
-    - groups_of_n_months (int): Number of months to process in each batch (default: 3)
-    """
-
-    # Load administrative boundaries
-    print("Loading administrative boundaries...")
-
-    # Mongolia: GADM level 2 (Soums)
-    try:
-        # Try to load from user assets first (more efficient)
-        mng_fc = ee.FeatureCollection("users/avraltod/gadm41_MNG_2")
-        mng_id_property = "GID_2"
-        print("✓ Loaded Mongolia boundaries from user assets")
-    except:
-        # Fallback: could implement GADM download here if needed
-        print(
-            "✗ Could not load Mongolia boundaries. Please ensure 'users/avraltod/gadm41_MNG_2' asset exists."
-        )
-        return
-
-    # Inner Mongolia, China: GADM level 3
-    try:
-        # Try to load from user assets first (more efficient)
-        chn_fc = ee.FeatureCollection("users/avraltod/gadm41_CHN_3").filter(
-            ee.Filter.eq("GID_1", "CHN.19_1")  # Inner Mongolia province
-        )
-        chn_id_property = "GID_3"
-        print("✓ Loaded Inner Mongolia boundaries from user assets")
-    except:
-        print(
-            "✗ Could not load Inner Mongolia boundaries. Please ensure 'users/avraltod/gadm41_CHN_3' asset exists."
-        )
-        return
-
-    # Process each year
-    total_years = end_year - start_year + 1
-    print(f"\nProcessing {total_years} years ({start_year}-{end_year})...")
-    print(f"Gap filling: {'ENABLED' if apply_gap_filling else 'DISABLED'}")
-    print(f"Hourly export: {'ENABLED' if export_hourly else 'DISABLED'}")
-    print(f"Seasonal export: {'ENABLED' if export_seasonal else 'DISABLED'}")
-    print(f"Export folder: {folder_name}\n")
-
-    for year in range(start_year, end_year + 1):
-        print(f"{'='*60}")
-        print(
-            f"PROCESSING YEAR: {year} ({year - start_year + 1}/{total_years})"
-        )
-        print(f"{'='*60}")
-
-        # Create month batches
-        month_batches = []
-        for start_month in range(1, 13, groups_of_n_months):
-            end_month = min(start_month + groups_of_n_months - 1, 12)
-            month_batches.append((start_month, end_month))
-
-        print(
-            f"Processing in {len(month_batches)} month batches: {month_batches}"
-        )
-
-        for batch_idx, (start_month, end_month) in enumerate(month_batches):
-            print(
-                f"\n--- BATCH {batch_idx + 1}/{len(month_batches)}: MONTHS {start_month}-{end_month} ---"
-            )
-
-            # Process Mongolia
-            print(f"\n--- MONGOLIA (GADM Level 2: Soums) ---")
-            try:
-                if export_seasonal:
-                    print("Exporting seasonal aggregates...")
-                    export_seasonal_weather_stats(
-                        year=year,
-                        region_fc=mng_fc,
-                        region_name="MNG",
-                        region_id_property=mng_id_property,
-                        scale=scale,
-                        folder_name=folder_name,
-                        apply_gap_filling=apply_gap_filling,
-                        start_month=start_month,
-                        end_month=end_month,
-                    )
-
-                if export_hourly:
-                    print("Exporting cleaned hourly data...")
-                    export_hourly_weather_data(
-                        year=year,
-                        region_fc=mng_fc,
-                        region_name="MNG",
-                        region_id_property=mng_id_property,
-                        scale=scale,
-                        folder_name=folder_name,
-                        apply_gap_filling=apply_gap_filling,
-                        start_month=start_month,
-                        end_month=end_month,
-                    )
-
-            except Exception as e:
-                print(
-                    f"ERROR processing Mongolia for year {year}, months {start_month}-{end_month}: {e}"
-                )
-
-            # Process Inner Mongolia, China
-            print(f"\n--- INNER MONGOLIA, CHINA (GADM Level 3: Counties) ---")
-            try:
-                if export_seasonal:
-                    print("Exporting seasonal aggregates...")
-                    export_seasonal_weather_stats(
-                        year=year,
-                        region_fc=chn_fc,
-                        region_name="CHN_IM",
-                        region_id_property=chn_id_property,
-                        scale=scale,
-                        folder_name=folder_name,
-                        apply_gap_filling=apply_gap_filling,
-                        start_month=start_month,
-                        end_month=end_month,
-                    )
-
-                if export_hourly:
-                    print("Exporting cleaned hourly data...")
-                    export_hourly_weather_data(
-                        year=year,
-                        region_fc=chn_fc,
-                        region_name="CHN_IM",
-                        region_id_property=chn_id_property,
-                        scale=scale,
-                        folder_name=folder_name,
-                        apply_gap_filling=apply_gap_filling,
-                        start_month=start_month,
-                        end_month=end_month,
-                    )
-
-            except Exception as e:
-                print(
-                    f"ERROR processing Inner Mongolia for year {year}, months {start_month}-{end_month}: {e}"
-                )
-
-        print(f"\nCompleted year {year}")
-
-    print(f"\n{'='*60}")
-    print(f"BATCH PROCESSING COMPLETE")
-    print(f"Processed {total_years} years for 2 regions")
-    print(f"Check Google Earth Engine Task Manager for export progress")
-    print(f"Files will be saved to Google Drive folder: {folder_name}")
-
-
 def process_single_region_batch(
     region_name,
     region_fc,
@@ -875,6 +709,6 @@ def run_full_processing():
         export_hourly=True,
         export_seasonal=True,
         apply_gap_filling=True,
-        folder_name="GEE_WEATHER_FINAL",
+        folder_name="GEE_WEATHER_EXPORTS",
         groups_of_n_months=3,  # Process in 3-month batches to avoid memory issues
     )
