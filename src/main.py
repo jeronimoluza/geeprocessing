@@ -242,14 +242,6 @@ def export_hourly_weather_data(
     - end_month (int): Ending month for processing (default: 12)
     """
     
-    # --- Define Seasons ---
-    seasons = {
-        "aut": {"months": [9, 10, 11], "name": "aut"},
-        "spr": {"months": [3, 4, 5], "name": "spr"},
-        "smr": {"months": [6, 7, 8], "name": "smr"},
-        "wtr": {"months": [12, 1, 2], "name": "wtr"},
-    }
-
     # Define core variables to process
     core_variables = [
         "temperature_2m",
@@ -263,7 +255,7 @@ def export_hourly_weather_data(
         "v_component_of_wind_10m",
     ]
 
-    # Get ERA5 collection for the specified month range
+    # --- Define date range ---
     start_date = ee.Date.fromYMD(year, start_month, 1)
     end_date = (
         ee.Date.fromYMD(year, end_month + 1, 1)
@@ -278,17 +270,11 @@ def export_hourly_weather_data(
         .select(core_variables)
     )
 
-    # Apply gap filling if requested
+    # --- Optional gap filling ---
     if apply_gap_filling:
-        # Expand date range for gap filling context (like in export_seasonal_weather_stats)
-        gap_fill_start = start_date.advance(
-            -1, "month"
-        )  # One month before for context
-        gap_fill_end = end_date.advance(
-            1, "month"
-        )  # One month after for context
+        gap_fill_start = start_date.advance(-1, "month")
+        gap_fill_end = end_date.advance(1, "month")
 
-        # Get expanded collection for gap filling
         gap_fill_collection = (
             ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
             .filterBounds(region_fc.geometry())
@@ -296,49 +282,55 @@ def export_hourly_weather_data(
             .select(core_variables)
         )
 
-        # Apply temporal gap filling to expanded collection
         gap_filled_collection = apply_temporal_gap_filling(
             gap_fill_collection, region_fc.geometry(), core_variables
         )
 
-        # Filter back to original date range after gap filling
-        era5_collection = gap_filled_collection.filterDate(
-            start_date, end_date
-        )
-
-        # Use gap-filled bands
+        era5_collection = gap_filled_collection.filterDate(start_date, end_date)
         variables_to_process = [v + "_filled" for v in core_variables]
     else:
         variables_to_process = core_variables
 
-    # Process images to add derived variables
+
+    # --- Function to classify month into season ---
+    def month_to_season(month):
+        """Return season name given ee.Number month"""
+        month = ee.Number(month)
+        return (
+            ee.Algorithms.If(month.eq(12).Or(month.lte(2)), "wtr",
+            ee.Algorithms.If(month.gte(3).And(month.lte(5)), "spr",
+            ee.Algorithms.If(month.gte(6).And(month.lte(8)), "smr",
+            "aut"))))
+
+
+    # --- Image processing ---
     def process_hourly_image(img):
-        # Select the appropriate bands (filled or original)
         if apply_gap_filling:
-            # Rename filled bands back to original names for processing
             processed = img.select(variables_to_process, core_variables)
         else:
             processed = img.select(variables_to_process)
 
-        # Apply standard processing (temperature conversion, wind calculations)
         processed = process_era5_image(processed)
 
-        # Add time information
-        processed = processed.set(
-            {
-                "year": img.date().get("year"),
-                "month": img.date().get("month"),
-                "day": img.date().get("day"),
-                "hour": img.date().get("hour"),
-                "system:time_start": img.get("system:time_start"),
-            }
-        )
+        month = img.date().get("month")
+        season = month_to_season(month)
+
+        processed = processed.set({
+            "year": img.date().get("year"),
+            "month": month,
+            "day": img.date().get("day"),
+            "hour": img.date().get("hour"),
+            "season": season,
+            "system:time_start": img.get("system:time_start"),
+        })
 
         return processed
 
+
     processed_collection = era5_collection.map(process_hourly_image)
 
-    # Reduce to regions and export
+
+    # --- Reduction step ---
     def reduce_to_regions(img):
         reduced = img.reduceRegions(
             collection=region_fc.select([region_id_property]),
@@ -347,24 +339,25 @@ def export_hourly_weather_data(
             tileScale=4,
         )
 
-        # Add time properties to each feature
         def add_time_props(feature):
-            return feature.set(
-                {
-                    "year": img.get("year"),
-                    "month": img.get("month"),
-                    "day": img.get("day"),
-                    "hour": img.get("hour"),
-                    "system:time_start": img.get("system:time_start"),
-                }
-            )
+            return feature.set({
+                "year": img.get("year"),
+                "month": img.get("month"),
+                "day": img.get("day"),
+                "hour": img.get("hour"),
+                "season": img.get("season"),
+                "system:time_start": img.get("system:time_start"),
+            })
 
         return reduced.map(add_time_props)
 
-    # Apply reduction and flatten
+
     hourly_fc = processed_collection.map(reduce_to_regions).flatten()
 
-    # Export to CSV
+    # Set geometry to null for all features
+    hourly_fc = hourly_fc.map(lambda f: f.setGeometry(None))
+
+    # --- Export task ---
     month_suffix = (
         f"_m{start_month:02d}-{end_month:02d}"
         if start_month != 1 or end_month != 12
@@ -381,9 +374,8 @@ def export_hourly_weather_data(
     )
 
     task.start()
-    print(
-        f"Started hourly export task for {region_name} {year}. Filename: {output_filename}"
-    )
+    print(f"Started hourly export task for {region_name} {year}. Filename: {output_filename}")
+
 
 
 def process_single_region_batch(

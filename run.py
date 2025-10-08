@@ -16,9 +16,8 @@ except Exception as e:
 print("Earth Engine API initialized successfully with default credentials.")
 
 # Time period for the analysis
-# START_YEAR = 1981
-START_YEAR = 2024
-END_YEAR = 2024
+START_YEAR = 2021
+END_YEAR = 2025
 
 # GEE Export Configuration
 EXPORT_FOLDER = "GEE_WEATHER_EXPORTS"
@@ -43,19 +42,18 @@ centroids = (
 roi = centroids.copy()
 roi["geometry"] = roi.geometry.to_crs(3857).buffer(BUFFER_ROI).to_crs(4326)
 
-roi.to_wkt().to_csv(
-    f"./data/roi_buffer_{int(BUFFER_ROI / 1000)}_km.csv", index=None
-)
-roi.to_file(f"./data/roi_buffer_{int(BUFFER_ROI / 1000)}_km.shp", driver='ESRI Shapefile')
-raise
+# roi.to_wkt().to_csv(
+#     f"./data/roi_buffer_{int(BUFFER_ROI / 1000)}_km.csv", index=None
+# )
+# roi.to_file(f"./data/shp/roi_buffer_{int(BUFFER_ROI / 1000)}_km.shp", driver='ESRI Shapefile')
 
 roi = geemap.geopandas_to_ee(roi)
 main.process_single_region_batch(
     NAME,
     roi,
     ID_PROPERTY,
-    start_year=2024,
-    end_year=2024,
+    start_year=START_YEAR,
+    end_year=END_YEAR,
     export_hourly=True,
     export_seasonal=False,
     apply_gap_filling=True,
