@@ -211,3 +211,4 @@ configs/auth/*.json
 
 # Data
 data/
+outputs/
