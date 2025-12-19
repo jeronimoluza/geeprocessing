@@ -1,4 +1,4 @@
-This objective of this project is to obtain Age and Sex Structured WorldPop data for administrative levels of Ukraine
+This objective of this project is to obtain and process Age and Sex Structured WorldPop data for administrative levels of Ukraine
 
 Area of interest: Ukraine
 
@@ -49,6 +49,26 @@ For each adm4 (including outskirts) in `data/aoi/adm4_w_outskirts.geojson`:
     2. For each extracted .tif file:
        - Process the file (clip/summarize by adm4 geometry)
        - Delete the .tif file after processing (for storage reasons)
+
+### Output Data
+
+The program outputs two CSV files containing the processed population data:
+- One CSV for ADM3 level results
+- One CSV for ADM4 with outskirts level results
+
+Each CSV contains 4 columns:
+- `adm3_pcode` or `adm4_pcode` - Administrative area code
+- `sex` - Sex category (m = male, f = female, t = both)
+- `age_group` - Age group code (00, 01, 05, etc.)
+- `pop` - Total population count for that demographic group in the area
+
+Example output table:
+
+| adm3_pcode | sex | age_group | pop |
+|------------|-----|-----------|-----|
+| UA36001 | f | 00 | 1250 |
+| UA36001 | m | 00 | 1320 |
+| UA36001 | f | 01 | 4890 |
 
 
 ## Data sources
