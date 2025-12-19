@@ -103,7 +103,7 @@ def sum_population_for_geometries(tif_path: str, geometries: gpd.GeoDataFrame) -
             geometries,
             tif_path,
             stats=['sum'],
-            nodata=-99999.,
+            nodata=-99999., # Fill value on the rasters
             all_touched=False
         )
         
