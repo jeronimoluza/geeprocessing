@@ -13,7 +13,7 @@ from src.file_managing import extract_worldpop_zip, delete_tif_file, get_tif_fil
 from src.rasters import parse_worldpop_filename, sum_population_for_geometries
 
 
-YEARS = [2020, 2021]
+YEARS = [2020, 2021, 2022]
 
 
 def get_project_paths():

@@ -74,10 +74,16 @@ def parse_worldpop_filename(filename: str) -> Dict[str, str]:
     stem = Path(filename).stem
     parts = stem.split("_")
     
+    sex = parts[1]
+    age_group = parts[2]
+    
+    if sex == "T" and age_group in ["F", "M"]:
+        sex, age_group = age_group, sex
+    
     return {
         "iso": parts[0],
-        "sex": parts[1],
-        "age_group": parts[2],
+        "sex": sex,
+        "age_group": age_group,
         "year": parts[3],
     }
 
