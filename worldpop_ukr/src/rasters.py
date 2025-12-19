@@ -6,6 +6,7 @@ import geopandas as gpd
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Tuple
+from rasterstats import zonal_stats
 
 
 def open_worldpop_raster(raster_path: str) -> xr.Dataset:
@@ -27,10 +28,8 @@ def open_worldpop_raster(raster_path: str) -> xr.Dataset:
     if not raster_path.exists():
         raise FileNotFoundError(f"Raster file not found: {raster_path}")
     
-    data = rioxarray.open_rasterio(raster_path)
+    data = rioxarray.open_rasterio(raster_path, mask_and_scale=True)
     print(f"Opened raster: {raster_path}")
-    print(f"  Shape: {data.shape}")
-    print(f"  CRS: {data.rio.crs}")
     
     return data
 
@@ -83,28 +82,33 @@ def parse_worldpop_filename(filename: str) -> Dict[str, str]:
     }
 
 
-def sum_population_for_geometry(raster: xr.DataArray, geometry, crs) -> float:
+def sum_population_for_geometries(tif_path: str, geometries: gpd.GeoDataFrame) -> list:
     """
-    Clip raster to a single geometry and sum the population values.
+    Calculate zonal statistics (sum) for geometries using rasterstats.
     
     Parameters
     ----------
-    raster : xr.DataArray
-        The raster data.
-    geometry : shapely.geometry
-        Single geometry to clip to.
-    crs : CRS
-        Coordinate reference system.
+    tif_path : str
+        Path to the raster TIF file.
+    geometries : gpd.GeoDataFrame
+        GeoDataFrame with geometries to calculate stats for.
     
     Returns
     -------
-    float
-        Sum of population values within the geometry.
+    list
+        List of population sums, one per geometry.
     """
     try:
-        clipped = raster.rio.clip([geometry], crs=crs, drop=True, all_touched=True)
-        values = clipped.values
-        valid_values = values[~np.isnan(values) & (values >= 0)]
-        return float(np.sum(valid_values))
-    except Exception:
-        return 0.0
+        stats = zonal_stats(
+            geometries,
+            tif_path,
+            stats=['sum'],
+            nodata=-99999.,
+            all_touched=False
+        )
+        
+        pop_sums = [float(stat.get('sum', 0) or 0) for stat in stats]
+        return pop_sums
+    except Exception as e:
+        print(f"Error calculating zonal stats for {tif_path}: {e}")
+        return [0.0] * len(geometries)

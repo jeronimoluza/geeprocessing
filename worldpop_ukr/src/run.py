@@ -10,10 +10,10 @@ if str(project_root) not in sys.path:
 
 from src.download import download_worldpop_data
 from src.file_managing import extract_worldpop_zip, delete_tif_file, get_tif_files
-from src.rasters import open_worldpop_raster, parse_worldpop_filename, sum_population_for_geometry
+from src.rasters import parse_worldpop_filename, sum_population_for_geometries
 
 
-YEARS = [2020, 2021, 2022]
+YEARS = [2020, 2021]
 
 
 def get_project_paths():
@@ -58,26 +58,20 @@ def process_raster_for_geometries(
     
     Returns list of dicts with pcode, sex, age_group, pop.
     """
-    raster = open_worldpop_raster(str(raster_path))
     metadata = parse_worldpop_filename(raster_path.name)
     
-    results = []
-    crs = geometries.crs
+    pop_sums = sum_population_for_geometries(str(raster_path), geometries)
     
-    for idx, row in tqdm(geometries.iterrows(), total=len(geometries), desc=f"Processing geometries", leave=False):
-        pcode = row[pcode_column]
-        geometry = row.geometry
-        
-        pop_sum = sum_population_for_geometry(raster, geometry, crs)
-        
-        results.append({
+    results = [
+        {
             pcode_column.lower(): pcode,
             "sex": metadata["sex"],
             "age_group": metadata["age_group"],
             "pop": pop_sum,
-        })
+        }
+        for pcode, pop_sum in zip(geometries[pcode_column], pop_sums)
+    ]
     
-    raster.close()
     return results
 
 
