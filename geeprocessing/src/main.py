@@ -55,9 +55,10 @@ def apply_temporal_gap_filling(collection, region, variables=None):
             "snow_cover",
             "snow_density",
             "snow_depth",
-            "snowfall",
-            "snowmelt",
-            "total_precipitation",
+            "snow_depth_water_equivalent",
+            "snowfall_hourly",
+            "snowmelt_hourly",
+            "total_precipitation_hourly",
             "u_component_of_wind_10m",
             "v_component_of_wind_10m",
         ]
@@ -68,9 +69,10 @@ def apply_temporal_gap_filling(collection, region, variables=None):
             "snow_cover",
             "snow_density",
             "snow_depth",
-            "snowfall",
-            "snowmelt",
-            "total_precipitation",
+            "snow_depth_water_equivalent",
+            "snowfall_hourly",
+            "snowmelt_hourly",
+            "total_precipitation_hourly",
             "u_component_of_wind_10m",
             "v_component_of_wind_10m",
         ]
@@ -168,9 +170,10 @@ def apply_temporal_gap_filling(collection, region, variables=None):
                 "snow_cover_filled",
                 "snow_density_filled",
                 "snow_depth_filled",
-                "snowfall_filled",
-                "snowmelt_filled",
-                "total_precipitation_filled",
+                "snow_depth_water_equivalent_filled",
+                "snowfall_hourly_filled",
+                "snowmelt_hourly_filled",
+                "total_precipitation_hourly_filled",
                 "u_component_of_wind_10m_filled",
                 "v_component_of_wind_10m_filled",
             ]
@@ -248,9 +251,10 @@ def export_hourly_weather_data(
         "snow_cover",
         "snow_density",
         "snow_depth",
-        "snowfall",
-        "snowmelt",
-        "total_precipitation",
+        "snow_depth_water_equivalent",
+        "snowfall_hourly",
+        "snowmelt_hourly",
+        "total_precipitation_hourly",
         "u_component_of_wind_10m",
         "v_component_of_wind_10m",
     ]
@@ -331,10 +335,19 @@ def export_hourly_weather_data(
 
 
     # --- Reduction step ---
+
     def reduce_to_regions(img):
+
+        stats_reducer = (
+            ee.Reducer.mean()
+            .combine(ee.Reducer.median(), "", True)
+            .combine(ee.Reducer.min(), "", True)
+            .combine(ee.Reducer.max(), "", True)
+        )
+
         reduced = img.reduceRegions(
             collection=region_fc.select([region_id_property]),
-            reducer=ee.Reducer.mean(),
+            reducer=stats_reducer,
             scale=scale,
             tileScale=4,
         )

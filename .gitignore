@@ -210,5 +210,4 @@ __marimo__/
 geeprocessing/configs/auth/*.json
 
 # Data
-geeprocessing/data/
-geeprocessing/outputs/
+data/
